@@ -20,6 +20,8 @@ import {
 
 export class ImageHandler {
   private readonly LAMBDA_PAYLOAD_LIMIT = 6 * 1024 * 1024;
+  private readonly LAMBDA_IMAGE_LIMIT = 4.2 * 1024 * 1024;
+  private readonly LAMBDA_IMAGE_LIMIT_DIVIDER = 0.5;
 
   constructor(private readonly s3Client: S3, private readonly rekognitionClient: Rekognition) {}
 
@@ -35,11 +37,21 @@ export class ImageHandler {
     let image: sharp.Sharp = null;
 
     if (edits.rotate !== undefined && edits.rotate === null) {
-      image = sharp(originalImage, options);
+      // HTBEYOND CUSTOMIZATION
+      // Original Code :
+      //  image = sharp(originalImage, options);
+      // Reaseon :
+      //  rotation is not needed for the image, so we can skip it.
+      image = sharp(originalImage, options).rotate();
     } else {
       const metadata = await sharp(originalImage, options).metadata();
       image = metadata.orientation
-        ? sharp(originalImage, options).withMetadata({ orientation: metadata.orientation })
+        ? // HTBEYOND CUSTOMIZATION
+          // Original Code :
+          //  ? sharp(originalImage, options).withMetadata({ orientation: metadata.orientation })
+          // Reaseon :
+          //  rotation is not needed for the image, so we can skip it.
+          sharp(originalImage, options).withMetadata()
         : sharp(originalImage, options).withMetadata();
     }
 
@@ -102,6 +114,16 @@ export class ImageHandler {
       }
     }
 
+    // HTBEYOND CUSTOMIZATION
+    // if size of image is larger than LAMBDA_IMAGE_LIMIT, then resize it to smaller size
+    const size = base64EncodedImage.length;
+
+    if (size > this.LAMBDA_IMAGE_LIMIT) {
+      const { width } = await sharp(base64EncodedImage).metadata();
+      const resized = sharp(await this.constraintImage(base64EncodedImage, width * this.LAMBDA_IMAGE_LIMIT_DIVIDER));
+      base64EncodedImage = (await resized.toBuffer()).toString("base64");
+    }
+
     // binary data need to be base64 encoded to pass to the API Gateway proxy https://docs.aws.amazon.com/apigateway/latest/developerguide/lambda-proxy-binary-media.html.
     // checks whether base64 encoded image fits in 6M limit, see https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html.
     if (base64EncodedImage.length > this.LAMBDA_PAYLOAD_LIMIT) {
@@ -157,6 +179,18 @@ export class ImageHandler {
         }
       }
     }
+
+    // HTBEYOND CUSTOMIZATION
+    // if size of image is larger than LAMBDA_IMAGE_LIMIT, then resize it to smaller size
+    const { width, size } = await originalImage.metadata();
+
+    if (size > this.LAMBDA_IMAGE_LIMIT) {
+      const resized = sharp(
+        await this.constraintImage(await originalImage.toBuffer(), width * this.LAMBDA_IMAGE_LIMIT_DIVIDER)
+      );
+      return resized;
+    }
+
     // Return the modified image
     return originalImage;
   }
@@ -670,5 +704,22 @@ export class ImageHandler {
     }
 
     return { imageBuffer, format };
+  }
+
+  /**
+   * HTBEYOND CUSTOMIZATION
+   * Reduces the image to a size that is less than LAMBDA_IMAGE_LIMIT.
+   * @param buffer the image buffer to be modified.
+   * @returns A modifications to the original image.
+   */
+  private async constraintImage(buffer, width) {
+    const done = await sharp(buffer).resize({ width, withoutEnlargement: true }).toBuffer();
+    console.log(`Image size is ${buffer.length} bytes, resizing to ${this.LAMBDA_IMAGE_LIMIT} bytes`);
+
+    if (done.byteLength > this.LAMBDA_IMAGE_LIMIT) {
+      return this.constraintImage(done, Math.round(width * this.LAMBDA_IMAGE_LIMIT_DIVIDER));
+    }
+
+    return done;
   }
 }
