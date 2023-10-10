@@ -21,7 +21,7 @@ import {
 export class ImageHandler {
   private readonly LAMBDA_PAYLOAD_LIMIT = 6 * 1024 * 1024;
   private readonly LAMBDA_IMAGE_LIMIT = 4.2 * 1024 * 1024;
-  private readonly LAMBDA_IMAGE_LIMIT_DIVIDER = 0.5;
+  private readonly LAMBDA_IMAGE_LIMIT_DIVIDER = 0.8;
 
   constructor(private readonly s3Client: S3, private readonly rekognitionClient: Rekognition) {}
 
@@ -88,7 +88,9 @@ export class ImageHandler {
   async process(imageRequestInfo: ImageRequestInfo): Promise<string> {
     const { originalImage, edits } = imageRequestInfo;
     const options = { failOnError: false, animated: imageRequestInfo.contentType === ContentTypes.GIF };
+
     let base64EncodedImage = "";
+    let imageBuffer = null;
 
     // Apply edits if specified
     if (edits && Object.keys(edits).length) {
@@ -99,17 +101,18 @@ export class ImageHandler {
       // modify image output if requested
       modifiedImage = this.modifyImageOutput(modifiedImage, imageRequestInfo);
       // convert to base64 encoded string
-      const imageBuffer = await modifiedImage.toBuffer();
+      imageBuffer = await modifiedImage.toBuffer();
       base64EncodedImage = imageBuffer.toString("base64");
     } else {
       if (imageRequestInfo.outputFormat !== undefined) {
         // convert image to Sharp and change output format if specified
         const modifiedImage = this.modifyImageOutput(sharp(originalImage, options), imageRequestInfo);
         // convert to base64 encoded string
-        const imageBuffer = await modifiedImage.toBuffer();
+        imageBuffer = await modifiedImage.toBuffer();
         base64EncodedImage = imageBuffer.toString("base64");
       } else {
         // no edits or output format changes, convert to base64 encoded image
+        imageBuffer = originalImage;
         base64EncodedImage = originalImage.toString("base64");
       }
     }
@@ -119,8 +122,9 @@ export class ImageHandler {
     const size = base64EncodedImage.length;
 
     if (size > this.LAMBDA_IMAGE_LIMIT) {
-      const { width } = await sharp(base64EncodedImage).metadata();
-      const resized = sharp(await this.constraintImage(base64EncodedImage, width * this.LAMBDA_IMAGE_LIMIT_DIVIDER));
+      const { width } = await sharp(imageBuffer).metadata();
+      const resized = sharp(await this.constraintImage(imageBuffer, width * this.LAMBDA_IMAGE_LIMIT_DIVIDER));
+
       base64EncodedImage = (await resized.toBuffer()).toString("base64");
     }
 
