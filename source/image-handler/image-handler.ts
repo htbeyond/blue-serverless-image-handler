@@ -717,11 +717,13 @@ export class ImageHandler {
    * @returns A modifications to the original image.
    */
   private async constraintImage(buffer, width) {
-    const done = await sharp(buffer).resize({ width, withoutEnlargement: true }).toBuffer();
+    const newWidth = Math.round(width);
+
+    const done = await sharp(buffer).resize({ width: newWidth, withoutEnlargement: true }).toBuffer();
     console.log(`Image size is ${buffer.length} bytes, resizing to ${this.LAMBDA_IMAGE_LIMIT} bytes`);
 
     if (done.byteLength > this.LAMBDA_IMAGE_LIMIT) {
-      return this.constraintImage(done, Math.round(width * this.LAMBDA_IMAGE_LIMIT_DIVIDER));
+      return this.constraintImage(done, Math.round(newWidth * this.LAMBDA_IMAGE_LIMIT_DIVIDER));
     }
 
     return done;
