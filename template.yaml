@@ -1,5 +1,5 @@
 {
-  "Description": "(SO0023) - Serverless Image Handler. Version v6.2.5 by HTBeyond",
+  "Description": "(SO0023) - Serverless Image Handler. Version v6.2.5",
   "Metadata":
     {
       "AWS::CloudFormation::Interface":
