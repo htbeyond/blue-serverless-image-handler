@@ -23,7 +23,7 @@ export class ImageHandler {
   private readonly LAMBDA_IMAGE_LIMIT = 4.2 * 1024 * 1024;
   private readonly LAMBDA_IMAGE_LIMIT_DIVIDER = 0.8;
 
-  constructor(private readonly s3Client: S3, private readonly rekognitionClient: Rekognition) { }
+  constructor(private readonly s3Client: S3, private readonly rekognitionClient: Rekognition) {}
 
   /**
    * Creates a Sharp object from Buffer
@@ -37,21 +37,11 @@ export class ImageHandler {
     let image: sharp.Sharp = null;
 
     if (edits.rotate !== undefined && edits.rotate === null) {
-      // HTBEYOND CUSTOMIZATION
-      // Original Code :
-      //  image = sharp(originalImage, options);
-      // Reaseon :
-      //  rotation is not needed for the image, so we can skip it.
-      image = sharp(originalImage, options).rotate();
+      image = sharp(originalImage, options);
     } else {
       const metadata = await sharp(originalImage, options).metadata();
       image = metadata.orientation
-        ? // HTBEYOND CUSTOMIZATION
-          // Original Code :
-          //  ? sharp(originalImage, options).withMetadata({ orientation: metadata.orientation })
-          // Reaseon :
-          //  rotation is not needed for the image, so we can skip it.
-          sharp(originalImage, options).withMetadata()
+        ? sharp(originalImage, options).withMetadata({ orientation: metadata.orientation })
         : sharp(originalImage, options).withMetadata();
     }
 
@@ -76,7 +66,6 @@ export class ImageHandler {
         modifiedOutputImage.toFormat(ImageHandler.convertImageFormatType(imageRequestInfo.outputFormat));
       }
     }
-
     return modifiedOutputImage;
   }
 
@@ -122,8 +111,10 @@ export class ImageHandler {
         base64EncodedImage = imageBuffer.toString("base64");
       } else {
         // no edits or output format changes, convert to base64 encoded image
-        imageBuffer = originalImage;
-        base64EncodedImage = originalImage.toString("base64");
+        const image: sharp.Sharp = sharp(originalImage, options).withMetadata();
+
+        imageBuffer = await image.toBuffer();
+        base64EncodedImage = imageBuffer.toString("base64");
       }
     }
 
@@ -133,7 +124,7 @@ export class ImageHandler {
 
     if (size > this.LAMBDA_IMAGE_LIMIT) {
       const { width } = await sharp(imageBuffer).metadata();
-      const resized = sharp(await this.constraintImage(imageBuffer, width * this.LAMBDA_IMAGE_LIMIT_DIVIDER));
+      const resized = await this.constraintImage(imageBuffer, width * this.LAMBDA_IMAGE_LIMIT_DIVIDER, options);
 
       base64EncodedImage = (await resized.toBuffer()).toString("base64");
     }
@@ -147,7 +138,6 @@ export class ImageHandler {
         "The converted image is too large to return."
       );
     }
-
     return base64EncodedImage;
   }
 
@@ -199,9 +189,12 @@ export class ImageHandler {
     const { width, size } = await originalImage.metadata();
 
     if (size > this.LAMBDA_IMAGE_LIMIT) {
-      const resized = sharp(
-        await this.constraintImage(await originalImage.toBuffer(), width * this.LAMBDA_IMAGE_LIMIT_DIVIDER)
+      const resized = await this.constraintImage(
+        await originalImage.toBuffer(),
+        width * this.LAMBDA_IMAGE_LIMIT_DIVIDER,
+        { animated: isAnimation }
       );
+
       return resized;
     }
 
@@ -311,9 +304,9 @@ export class ImageHandler {
         typeof edits.smartCrop === "object"
           ? edits.smartCrop
           : {
-            faceIndex: undefined,
-            padding: undefined,
-          };
+              faceIndex: undefined,
+              padding: undefined,
+            };
       const { imageBuffer, format } = await this.getRekognitionCompatibleImage(originalImage);
       const boundingBox = await this.getBoundingBox(imageBuffer.data, faceIndex ?? 0);
       const cropArea = this.getCropArea(boundingBox, padding ?? 0, imageBuffer.info);
@@ -362,11 +355,11 @@ export class ImageHandler {
         typeof edits.roundCrop === "object"
           ? edits.roundCrop
           : {
-            top: undefined,
-            left: undefined,
-            rx: undefined,
-            ry: undefined,
-          };
+              top: undefined,
+              left: undefined,
+              rx: undefined,
+              ry: undefined,
+            };
       const imageBuffer = await originalImage.toBuffer({ resolveWithObject: true });
       const width = imageBuffer.info.width;
       const height = imageBuffer.info.height;
@@ -431,10 +424,10 @@ export class ImageHandler {
         typeof edits.contentModeration === "object"
           ? edits.contentModeration
           : {
-            minConfidence: undefined,
-            blur: undefined,
-            moderationLabels: undefined,
-          };
+              minConfidence: undefined,
+              blur: undefined,
+              moderationLabels: undefined,
+            };
       const { imageBuffer, format } = await this.getRekognitionCompatibleImage(originalImage);
       const inappropriateContent = await this.detectInappropriateContent(imageBuffer.data, minConfidence);
 
@@ -727,16 +720,18 @@ export class ImageHandler {
    * @param buffer the image buffer to be modified.
    * @returns A modifications to the original image.
    */
-  private async constraintImage(buffer, width) {
+  private async constraintImage(buffer, width, options) {
     const newWidth = Math.round(width);
 
-    const done = await sharp(buffer).resize({ width: newWidth, withoutEnlargement: true }).toBuffer();
-    console.log(`Image size is ${buffer.length} bytes, resizing to ${this.LAMBDA_IMAGE_LIMIT} bytes`);
+    const resizedImage = sharp(buffer, options).resize({ width: newWidth, withoutEnlargement: true });
+
+    const done = await resizedImage.toBuffer();
+
+    console.log(`Image size is ${buffer.byteLength} bytes, resizing to ${done.byteLength} bytes`);
 
     if (done.byteLength > this.LAMBDA_IMAGE_LIMIT) {
-      return this.constraintImage(done, Math.round(newWidth * this.LAMBDA_IMAGE_LIMIT_DIVIDER));
+      return this.constraintImage(done, Math.round(newWidth * this.LAMBDA_IMAGE_LIMIT_DIVIDER), options);
     }
-
-    return done;
+    return resizedImage;
   }
 }
