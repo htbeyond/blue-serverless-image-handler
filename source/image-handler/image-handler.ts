@@ -723,7 +723,7 @@ export class ImageHandler {
   private async constraintImage(buffer, width, options) {
     const newWidth = Math.round(width);
 
-    const resizedImage = sharp(buffer, options).resize({ width: newWidth, withoutEnlargement: true });
+    const resizedImage = sharp(buffer, options).resize({ width: newWidth, withoutEnlargement: true }).withMetadata();
 
     const done = await resizedImage.toBuffer();
 
