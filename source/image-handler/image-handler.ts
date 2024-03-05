@@ -22,6 +22,8 @@ export class ImageHandler {
   private readonly LAMBDA_PAYLOAD_LIMIT = 6 * 1024 * 1024;
   private readonly LAMBDA_IMAGE_LIMIT = 4.2 * 1024 * 1024;
   private readonly LAMBDA_IMAGE_LIMIT_DIVIDER = 0.8;
+  private readonly MAX_ATTEMPTS = 5;
+  private readonly MAX_WIDTH = 800;
 
   constructor(private readonly s3Client: S3, private readonly rekognitionClient: Rekognition) {}
 
@@ -76,7 +78,10 @@ export class ImageHandler {
    */
   async process(imageRequestInfo: ImageRequestInfo): Promise<string> {
     const { originalImage, edits } = imageRequestInfo;
-    const options = { failOnError: false, animated: imageRequestInfo.contentType === ContentTypes.GIF };
+
+    const supportsAnimation =
+      imageRequestInfo.contentType === ContentTypes.GIF || imageRequestInfo.contentType === ContentTypes.WEBP;
+    const options = { failOnError: false, animated: supportsAnimation };
 
     let base64EncodedImage = "";
     let imageBuffer = null;
@@ -108,14 +113,15 @@ export class ImageHandler {
         const modifiedImage = this.modifyImageOutput(sharp(originalImage, options), imageRequestInfo);
         // convert to base64 encoded string
         imageBuffer = await modifiedImage.toBuffer();
-        base64EncodedImage = imageBuffer.toString("base64");
+      } else if (options.animated) {
+        // no edits or output format changes, convert to base64 encoded gif and webp
+        imageBuffer = originalImage;
       } else {
-        // no edits or output format changes, convert to base64 encoded image
+        // add metadata
         const image: sharp.Sharp = sharp(originalImage, options).withMetadata();
-
         imageBuffer = await image.toBuffer();
-        base64EncodedImage = imageBuffer.toString("base64");
       }
+      base64EncodedImage = imageBuffer.toString("base64");
     }
 
     // HTBEYOND CUSTOMIZATION
@@ -123,10 +129,8 @@ export class ImageHandler {
     const size = base64EncodedImage.length;
 
     if (size > this.LAMBDA_IMAGE_LIMIT) {
-      const { width } = await sharp(imageBuffer).metadata();
-      const resized = await this.constraintImage(imageBuffer, width * this.LAMBDA_IMAGE_LIMIT_DIVIDER, options);
-
-      base64EncodedImage = (await resized.toBuffer()).toString("base64");
+      const resizedImage = await this.constraintImage(imageBuffer, edits, options);
+      base64EncodedImage = (await resizedImage.toBuffer()).toString("base64");
     }
 
     // binary data need to be base64 encoded to pass to the API Gateway proxy https://docs.aws.amazon.com/apigateway/latest/developerguide/lambda-proxy-binary-media.html.
@@ -184,21 +188,6 @@ export class ImageHandler {
       }
     }
 
-    // HTBEYOND CUSTOMIZATION
-    // if size of image is larger than LAMBDA_IMAGE_LIMIT, then resize it to smaller size
-    const { width, size } = await originalImage.metadata();
-
-    if (size > this.LAMBDA_IMAGE_LIMIT) {
-      const resized = await this.constraintImage(
-        await originalImage.toBuffer(),
-        width * this.LAMBDA_IMAGE_LIMIT_DIVIDER,
-        { animated: isAnimation }
-      );
-
-      return resized;
-    }
-
-    // Return the modified image
     return originalImage;
   }
 
@@ -720,17 +709,34 @@ export class ImageHandler {
    * @param buffer the image buffer to be modified.
    * @returns A modifications to the original image.
    */
-  private async constraintImage(buffer, width, options) {
-    const newWidth = Math.round(width);
+  private async constraintImage(buffer, edits, originOptions, attempt = 0) {
+    const { width } = await sharp(buffer).metadata();
+    const newWidth =
+      Math.round(width * this.LAMBDA_IMAGE_LIMIT_DIVIDER) > this.MAX_WIDTH
+        ? this.MAX_WIDTH
+        : Math.round(width * this.LAMBDA_IMAGE_LIMIT_DIVIDER);
 
-    const resizedImage = sharp(buffer, options).resize({ width: newWidth, withoutEnlargement: true }).withMetadata();
+    // Set a maximum number of retry attempts to prevent infinite recursion    const maxAttempts = 5;
+    if (attempt >= this.MAX_ATTEMPTS) {
+      throw new Error("Maximum resize attempts reached, unable to reduce image size sufficiently.");
+    }
 
-    const done = await resizedImage.toBuffer();
+    const options = originOptions.animated ? { ...originOptions, pages: -1 } : originOptions;
 
-    console.log(`Image size is ${buffer.byteLength} bytes, resizing to ${done.byteLength} bytes`);
+    const resizeOptions = {
+      width: newWidth,
+      withoutEnlargement: true,
+      fit: edits?.resize?.fit ?? ImageFitTypes.INSIDE,
+    };
 
-    if (done.byteLength > this.LAMBDA_IMAGE_LIMIT) {
-      return this.constraintImage(done, Math.round(newWidth * this.LAMBDA_IMAGE_LIMIT_DIVIDER), options);
+    const resizedImage = await sharp(buffer, options).resize(resizeOptions).withMetadata();
+
+    const doneBuffer = await resizedImage.toBuffer();
+
+    console.info(`Image size is ${buffer.byteLength} bytes, resizing to ${doneBuffer.byteLength} bytes`);
+
+    if (doneBuffer.byteLength > this.LAMBDA_IMAGE_LIMIT) {
+      return await this.constraintImage(doneBuffer, edits, originOptions, attempt + 1);
     }
     return resizedImage;
   }
