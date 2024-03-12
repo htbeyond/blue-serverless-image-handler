@@ -106,7 +106,6 @@ export class ImageHandler {
       modifiedImage = this.modifyImageOutput(modifiedImage, imageRequestInfo);
       // convert to base64 encoded string
       imageBuffer = await modifiedImage.toBuffer();
-      base64EncodedImage = imageBuffer.toString("base64");
     } else {
       if (imageRequestInfo.outputFormat !== undefined) {
         // convert image to Sharp and change output format if specified
@@ -121,16 +120,15 @@ export class ImageHandler {
         const image: sharp.Sharp = sharp(originalImage, options).withMetadata();
         imageBuffer = await image.toBuffer();
       }
-      base64EncodedImage = imageBuffer.toString("base64");
     }
+    base64EncodedImage = imageBuffer.toString("base64");
 
     // HTBEYOND CUSTOMIZATION
     // if size of image is larger than LAMBDA_IMAGE_LIMIT, then resize it to smaller size
-    const size = base64EncodedImage.length;
-
+    const size = imageBuffer.byteLength;
     if (size > this.LAMBDA_IMAGE_LIMIT) {
-      const resizedImage = await this.constraintImage(imageBuffer, edits, options);
-      base64EncodedImage = (await resizedImage.toBuffer()).toString("base64");
+      const resizedBuffer = await this.constraintImage(imageBuffer, edits, options);
+      base64EncodedImage = resizedBuffer.toString("base64");
     }
 
     // binary data need to be base64 encoded to pass to the API Gateway proxy https://docs.aws.amazon.com/apigateway/latest/developerguide/lambda-proxy-binary-media.html.
@@ -731,13 +729,13 @@ export class ImageHandler {
 
     const resizedImage = await sharp(buffer, options).resize(resizeOptions).withMetadata();
 
-    const doneBuffer = await resizedImage.toBuffer();
+    const resizedBuffer = await resizedImage.toBuffer();
 
-    console.info(`Image size is ${buffer.byteLength} bytes, resizing to ${doneBuffer.byteLength} bytes`);
+    console.info(`Image size is ${buffer.byteLength} bytes, resizing to ${resizedBuffer.byteLength} bytes`);
 
-    if (doneBuffer.byteLength > this.LAMBDA_IMAGE_LIMIT) {
-      return await this.constraintImage(doneBuffer, edits, originOptions, attempt + 1);
+    if (resizedBuffer.byteLength > this.LAMBDA_IMAGE_LIMIT) {
+      return await this.constraintImage(resizedBuffer, edits, originOptions, attempt + 1);
     }
-    return resizedImage;
+    return resizedBuffer;
   }
 }
