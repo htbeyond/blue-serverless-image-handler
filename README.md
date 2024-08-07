@@ -11,7 +11,7 @@
   - [Prerequisites for Customization](#prerequisites-for-customization)
     - [1. Clone the repository](#1-clone-the-repository)
     - [2. Unit Test](#2-unit-test)
-    - [3. Build & Deploy](#3-build-and-deploy)
+    - [3. Build and Deploy](#3-build-and-deploy)
 - [Collection of operational metrics](#collection-of-operational-metrics)
 - [External Contributors](#external-contributors)
 - [License](#license)
@@ -54,7 +54,6 @@ cd serverless-image-handler
 export MAIN_DIRECTORY=$PWD
 ```
 
-
 ### 2. Unit Test
 
 After making changes, run unit tests to make sure added customization passes the tests:
@@ -65,17 +64,27 @@ chmod +x run-unit-tests.sh && ./run-unit-tests.sh
 ```
 
 ### 3. Build and Deploy
+
 ```bash
 cd $MAIN_DIRECTORY/source/constructs
 npm run clean:install
 overrideWarningsEnabled=false npx cdk bootstrap --profile <PROFILE_NAME>
+
+# overrideWarningsEnabled=false npx cdk deploy\
+#  --parameters DeployDemoUIParameter=Yes\
+#   --parameters SourceBucketsParameter=<MY_BUCKET>\
+#    --profile <PROFILE_NAME>
+
+# HTBeyond Customization
 overrideWarningsEnabled=false npx cdk deploy\
- --parameters DeployDemoUIParameter=Yes\
-  --parameters SourceBucketsParameter=<MY_BUCKET>\
-   --profile <PROFILE_NAME>
+  --parameters DeployDemoUIParameter=Yes\
+  --parameters SourceBucketsParameter=blue-community-storage,alpha-blue-community-storage,dev-blue-community-storage\
+  --parameters AutoWebPParameter=Yes\
+  # --profile <PROFILE_NAME>
 ```
 
 _Note:_
+
 - **MY_BUCKET**: name of an existing bucket in your account
 - **PROFILE_NAME**: name of an AWS CLI profile that has appropriate credentials for deploying in your preferred region
 
@@ -108,5 +117,5 @@ This solution collects anonymous operational metrics to help AWS improve the qua
 
 # License
 
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.   
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.  
 SPDX-License-Identifier: Apache-2.0
