@@ -17,7 +17,13 @@
     "pretest": "npm run clean:install",
     "build": "tsc",
     "watch": "tsc -w",
-    "test": "overrideWarningsEnabled=false jest --coverage"
+    "test": "overrideWarningsEnabled=false jest --coverage",
+    "cdk-bootstrap:dev": "npm run clean:install && overrideWarningsEnabled=false npx cdk bootstrap -c stackId=ServerlessImageHandlerStackDevelop",
+    "cdk-bootstrap": "npm run clean:install && overrideWarningsEnabled=false npx cdk bootstrap -c stackId=ServerlessImageHandlerStack",
+    "cdk-deploy:dev":"overrideWarningsEnabled=false npx cdk deploy -c stackId=ServerlessImageHandlerStackDevelop --parameters DeployDemoUIParameter=Yes --parameters SourceBucketsParameter=blue-community-storage,alpha-blue-community-storage,dev-blue-community-storage --parameters AutoWebPParameter=Yes",
+    "cdk-deploy":"overrideWarningsEnabled=false npx cdk deploy -c stackId=ServerlessImageHandlerStack --parameters DeployDemoUIParameter=Yes --parameters SourceBucketsParameter=blue-community-storage,alpha-blue-community-storage,dev-blue-community-storage --parameters AutoWebPParameter=Yes",
+    "deploy:dev": "npm run cdk-bootstrap:dev && npm run cdk-deploy:dev",
+    "deploy": "npm run cdk-bootstrap && npm run cdk-deploy"
   },
   "devDependencies": {
     "@aws-cdk/aws-servicecatalogappregistry-alpha": "v2.118.0-alpha.0",
