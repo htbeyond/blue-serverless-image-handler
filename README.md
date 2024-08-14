@@ -64,23 +64,21 @@ chmod +x run-unit-tests.sh && ./run-unit-tests.sh
 ```
 
 ### 3. Build and Deploy
-
-```bash
+<!-- ```bash
 cd $MAIN_DIRECTORY/source/constructs
 npm run clean:install
 overrideWarningsEnabled=false npx cdk bootstrap --profile <PROFILE_NAME>
 
-# overrideWarningsEnabled=false npx cdk deploy\
-#  --parameters DeployDemoUIParameter=Yes\
-#   --parameters SourceBucketsParameter=<MY_BUCKET>\
-#    --profile <PROFILE_NAME>
-
-# HTBeyond Customization
 overrideWarningsEnabled=false npx cdk deploy\
-  --parameters DeployDemoUIParameter=Yes\
-  --parameters SourceBucketsParameter=blue-community-storage,alpha-blue-community-storage,dev-blue-community-storage\
-  --parameters AutoWebPParameter=Yes\
-  # --profile <PROFILE_NAME>
+ --parameters DeployDemoUIParameter=Yes\
+  --parameters SourceBucketsParameter=<MY_BUCKET>\
+   --profile <PROFILE_NAME>
+``` -->
+
+```bash
+cd $MAIN_DIRECTORY/source/constructs
+npm run deploy:dev # develop
+npm run deploy # production
 ```
 
 _Note:_
