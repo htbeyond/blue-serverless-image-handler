@@ -1,0 +1,17 @@
+template-file-path: template.yaml
+parameters:
+  AutoWebPParameter: 'No'
+  CloudFrontPriceClassParameter: PriceClass_All
+  CorsEnabledParameter: 'No'
+  CorsOriginParameter: '*'
+  DeployDemoUIParameter: 'Yes'
+  EnableDefaultFallbackImageParameter: 'No'
+  EnableSignatureParameter: "No\t"
+  FallbackImageS3BucketParameter: '-'
+  FallbackImageS3KeyParameter: '-'
+  LogRetentionPeriodParameter: '1'
+  SecretsManagerKeyParameter: '-'
+  SecretsManagerSecretParameter: '-'
+  SourceBucketsParameter: >-
+    blue-community-storage,alpha-blue-community-storage,dev-blue-community-storage
+tags: {}
