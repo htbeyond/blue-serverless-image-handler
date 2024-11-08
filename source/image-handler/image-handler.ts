@@ -53,7 +53,7 @@ export class ImageHandler {
    * @returns A Sharp image object
    */
   private modifyImageOutput(modifiedImage: sharp.Sharp, imageRequestInfo: ImageRequestInfo): sharp.Sharp {
-    const modifiedOutputImage = modifiedImage.withMetadata().rotate(); 
+    const modifiedOutputImage = modifiedImage.rotate().withMetadata({ orientation: 1 }); 
 
     // modify if specified
     if (imageRequestInfo.outputFormat !== undefined) {
@@ -113,8 +113,7 @@ export class ImageHandler {
         imageBuffer = originalImage;
       } else {
         // add metadata
-        const image: sharp.Sharp = sharp(originalImage, options).withMetadata().rotate(); // rotate() 추가
-        imageBuffer = await image.toBuffer();
+        const image: sharp.Sharp = sharp(originalImage, options).rotate().withMetadata({ orientation: 1 }); 
       }
     }
     base64EncodedImage = imageBuffer.toString("base64");
