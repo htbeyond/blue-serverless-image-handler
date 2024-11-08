@@ -113,7 +113,7 @@ export class ImageHandler {
         imageBuffer = originalImage;
       } else {
         // add metadata
-        const image: sharp.Sharp = sharp(originalImage, options).withMetadata();
+        const image: sharp.Sharp = sharp(originalImage, options).withMetadata().rotate(); // rotate() 추가
         imageBuffer = await image.toBuffer();
       }
     }
@@ -138,6 +138,7 @@ export class ImageHandler {
     }
     return base64EncodedImage;
   }
+
 
   /**
    * Applies image modifications to the original image based on edits.
