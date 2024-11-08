@@ -37,23 +37,30 @@ export class ImageRequest {
    * @param imageRequestInfo Initialized image request information
    * @param event Lambda requrest body
    */
+
   private determineOutputFormat(imageRequestInfo: ImageRequestInfo, event: ImageHandlerEvent): void {
     const outputFormat = this.getOutputFormat(event, imageRequestInfo.requestType);
+
     // if webp check reduction effort, if invalid value, use 4 (default in sharp)
     if (outputFormat === ImageFormatTypes.WEBP && imageRequestInfo.requestType === RequestTypes.DEFAULT) {
-      const decoded = this.decodeRequest(event);
-      if (typeof decoded.effort !== "undefined") {
-        const effort = Math.trunc(decoded.effort);
-        const isValid = !isNaN(effort) && effort >= 0 && effort <= 6;
-        imageRequestInfo.effort = isValid ? effort : ImageRequest.DEFAULT_EFFORT;
-      }
-    }
-    if (imageRequestInfo.edits?.toFormat) {
-      imageRequestInfo.outputFormat = imageRequestInfo.edits.toFormat;
+        const decoded = this.decodeRequest(event);
+        const effort = decoded.effort ?? ImageRequest.DEFAULT_EFFORT;
+        imageRequestInfo.effort = Math.trunc(effort);
+        imageRequestInfo.edits = {
+            ...imageRequestInfo.edits,
+            toFormat: ImageFormatTypes.WEBP,
+            withMetadata: true,
+        };
+    } 
+     if (imageRequestInfo.edits?.toFormat) {
+        imageRequestInfo.outputFormat = imageRequestInfo.edits.toFormat;
+        imageRequestInfo.edits.withMetadata = true;
     } else if (outputFormat) {
-      imageRequestInfo.outputFormat = outputFormat;
+
+        imageRequestInfo.outputFormat = outputFormat;
     }
-  }
+}
+
 
   /**
    * Fix quality for Thumbor and Custom request type if outputFormat is different from quality type.
@@ -433,7 +440,8 @@ export class ImageRequest {
     const accept = event.headers?.Accept || event.headers?.accept;
 
     if (AUTO_WEBP === "Yes" && accept && accept.includes(ContentTypes.WEBP)) {
-      return ImageFormatTypes.WEBP;
+        event.headers["withMetadata"] = "true";
+        return ImageFormatTypes.WEBP;
     } else if (requestType === RequestTypes.DEFAULT) {
       const decoded = this.decodeRequest(event);
       return decoded.outputFormat;
