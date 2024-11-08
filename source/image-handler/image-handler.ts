@@ -63,9 +63,9 @@ export class ImageHandler {
     if (imageRequestInfo.outputFormat !== undefined) {
       // Include reduction effort for webp images if included
       if (imageRequestInfo.outputFormat === ImageFormatTypes.WEBP && typeof imageRequestInfo.effort !== "undefined") {
-        modifiedOutputImage.webp({ effort: imageRequestInfo.effort });
+        modifiedOutputImage.withMetadata().webp({ effort: imageRequestInfo.effort });
       } else {
-        modifiedOutputImage.toFormat(ImageHandler.convertImageFormatType(imageRequestInfo.outputFormat));
+        modifiedOutputImage.withMetadata().toFormat(ImageHandler.convertImageFormatType(imageRequestInfo.outputFormat));
       }
     }
     return modifiedOutputImage;
