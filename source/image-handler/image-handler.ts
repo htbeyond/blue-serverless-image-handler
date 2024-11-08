@@ -39,7 +39,7 @@ export class ImageHandler {
     let image: sharp.Sharp = null;
 
     if (edits.rotate !== undefined && edits.rotate === null) {
-      image = sharp(originalImage, options);
+      image = sharp(originalImage, options).metadata();
     } else {
       const metadata = await sharp(originalImage, options).metadata();
       image = metadata.orientation
@@ -57,15 +57,15 @@ export class ImageHandler {
    * @returns A Sharp image object
    */
   private modifyImageOutput(modifiedImage: sharp.Sharp, imageRequestInfo: ImageRequestInfo): sharp.Sharp {
-    const modifiedOutputImage = modifiedImage;
+    const modifiedOutputImage = modifiedImage.withMetadata(); // 메타데이터 유지
 
     // modify if specified
     if (imageRequestInfo.outputFormat !== undefined) {
       // Include reduction effort for webp images if included
       if (imageRequestInfo.outputFormat === ImageFormatTypes.WEBP && typeof imageRequestInfo.effort !== "undefined") {
-        modifiedOutputImage.withMetadata().webp({ effort: imageRequestInfo.effort });
+        modifiedOutputImage.webp({ effort: imageRequestInfo.effort });
       } else {
-        modifiedOutputImage.withMetadata().toFormat(ImageHandler.convertImageFormatType(imageRequestInfo.outputFormat));
+        modifiedOutputImage.toFormat(ImageHandler.convertImageFormatType(imageRequestInfo.outputFormat));
       }
     }
     return modifiedOutputImage;
