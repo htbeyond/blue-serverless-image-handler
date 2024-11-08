@@ -53,7 +53,7 @@ export class ImageHandler {
    * @returns A Sharp image object
    */
   private modifyImageOutput(modifiedImage: sharp.Sharp, imageRequestInfo: ImageRequestInfo): sharp.Sharp {
-    const modifiedOutputImage = modifiedImage.withMetadata(); // 메타데이터 유지
+    const modifiedOutputImage = modifiedImage.withMetadata().rotate(); 
 
     // modify if specified
     if (imageRequestInfo.outputFormat !== undefined) {
